@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 FONT = str(Path(__file__).parent / "NotoSansKannada.ttf")
 W, H = 1080, 1207
-YEL, BLK = (230, 189, 0), (17, 17, 17)
+YEL, BLK, NAVY = (230, 189, 0), (17, 17, 17), (29, 42, 68)
 
 # ---- FIXED PARTS (edit here only if the template ever changes) ----
 TITLE = "ನಿತ್ಯ ಸತ್ಯ"
@@ -40,41 +40,89 @@ def wrap(d, text, f, max_w):
     return lines
 
 
+def smooth(size, fn, S=4):
+    """Draw shapes at S x size and shrink -> anti-aliased edges."""
+    w, h = size
+    big = Image.new("RGBA", (w * S, h * S), (0, 0, 0, 0))
+    fn(ImageDraw.Draw(big), S)
+    return big.resize((w, h), Image.LANCZOS)
+
+
+def comma(dr, S, cx, cy):
+    """Round blob with a curved tail going down-left (like the 9 of a closing quote)."""
+    r = 31
+    dr.ellipse(((cx - r) * S, (cy - r) * S, (cx + r) * S, (cy + r) * S), fill=BLK)
+    pts = []
+    # curved tail: right edge of blob -> tip -> left edge of blob
+    for t in range(0, 21):
+        u = t / 20
+        x = (1 - u) ** 2 * (cx + r) + 2 * (1 - u) * u * (cx + 26) + u ** 2 * (cx - 30)
+        y = (1 - u) ** 2 * (cy + 4) + 2 * (1 - u) * u * (cy + 50) + u ** 2 * (cy + 68)
+        pts.append((x * S, y * S))
+    for t in range(0, 21):
+        u = t / 20
+        x = (1 - u) ** 2 * (cx - 30) + 2 * (1 - u) * u * (cx - 8) + u ** 2 * (cx - r)
+        y = (1 - u) ** 2 * (cy + 68) + 2 * (1 - u) * u * (cy + 28) + u ** 2 * (cy + 4)
+        pts.append((x * S, y * S))
+    dr.polygon(pts, fill=BLK)
+
+
+def quote_marks(img):
+    # closing mark (top-right)
+    lay = smooth((200, 130), lambda dr, S: (comma(dr, S, 60, 40), comma(dr, S, 138, 40)))
+    img.paste(lay, (825, 235), lay)
+    # opening mark (bottom-left) = same shape turned 180 degrees
+    op = lay.rotate(180)
+    img.paste(op, (40, 880), op)
+
+
+def compass(img, cx, cy):
+    def fn(dr, S):
+        c = 55
+        dr.ellipse(((c - 37) * S, (c - 37) * S, (c + 37) * S, (c + 37) * S), outline=NAVY, width=3 * S)
+        dr.ellipse(((c - 31) * S, (c - 31) * S, (c + 31) * S, (c + 31) * S), outline=NAVY, width=2 * S)
+        import math
+        pts = []
+        for i in range(16):
+            ang = math.radians(i * 22.5 - 90)
+            rad = [29, 7, 12, 7][i % 4] if i % 2 == 0 or True else 7
+            rad = 29 if i % 4 == 0 else (17 if i % 4 == 2 else 6)
+            pts.append(((c + rad * math.cos(ang)) * S, (c + rad * math.sin(ang)) * S))
+        dr.polygon(pts, fill=NAVY)
+        dr.ellipse(((c - 4) * S, (c - 4) * S, (c + 4) * S, (c + 4) * S), fill=YEL)
+    lay = smooth((110, 110), fn)
+    img.paste(lay, (cx - 55, cy - 55), lay)
+
+
 def make_image(quote: str) -> Image.Image:
     img = Image.new("RGB", (W, H), YEL)
+
+    # soft light in the middle, like the original
+    glow = Image.radial_gradient("L").resize((W, H))
+    light = Image.new("RGB", (W, H), (240, 200, 10))
+    img = Image.composite(img, light, glow.point(lambda v: min(255, v * 2)))
+
     d = ImageDraw.Draw(img)
+    d.text((W / 2, 100), TITLE, font=font(68), fill=BLK, anchor="mm")
+    d.text((500, 1120), FOOTER, font=font(44), fill=BLK, anchor="mm")
 
-    # title + footer
-    d.text((W / 2, 100), TITLE, font=font(70), fill=BLK, anchor="mm")
-    d.text((500, 1120), FOOTER, font=font(46), fill=BLK, anchor="mm")
-
-    # frame
     for box in [(124, 222, 788, 245), (124, 222, 146, 882), (906, 368, 928, 945),
                 (264, 1005, 806, 1027), (830, 1005, 928, 1027), (906, 968, 928, 1027)]:
         d.rectangle(box, fill=BLK)
 
-    # quote marks (drawn as shapes so no extra font is needed)
-    qf = font(300, 700)
-    d.text((920, 350), "\u201D", font=qf, fill=BLK, anchor="mm")
-    d.text((135, 1090), "\u201C", font=qf, fill=BLK, anchor="mm")
+    quote_marks(img)
+    compass(img, 1008, 1135)
 
-    # compass logo
-    cx, cy = 1008, 1135
-    d.ellipse((cx - 36, cy - 36, cx + 36, cy + 36), outline=(29, 42, 68), width=3)
-    d.ellipse((cx - 30, cy - 30, cx + 30, cy + 30), outline=(29, 42, 68), width=2)
-    d.polygon([(cx, cy - 28), (cx + 6, cy), (cx, cy + 28), (cx - 6, cy)], fill=(29, 42, 68))
-    d.polygon([(cx - 28, cy), (cx, cy - 6), (cx + 28, cy), (cx, cy + 6)], fill=(29, 42, 68))
-
-    # fixed watermark (rotated, faint)
+    # fixed watermark: thin, tilted, faint
     wm = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(wm).text((W / 2, 640), WATERMARK, font=font(96, 400),
-                            fill=(0, 0, 0, 95), anchor="mm")
-    wm = wm.rotate(19, center=(W / 2, 640), resample=Image.BICUBIC)
+    ImageDraw.Draw(wm).text((W / 2, 650), WATERMARK, font=font(92, 300),
+                            fill=(0, 0, 0, 80), anchor="mm")
+    wm = wm.rotate(19, center=(W / 2, 650), resample=Image.BICUBIC)
     img.paste(wm, (0, 0), wm)
 
-    # daily quote: auto-fit inside the frame
+    # daily quote, auto-fit
     d = ImageDraw.Draw(img)
-    bx, by, bw, bh = 190, 290, 690, 640
+    bx, by, bw, bh = 200, 345, 660, 580
     quote = quote.strip()
     if quote:
         size = 110
@@ -92,16 +140,40 @@ def make_image(quote: str) -> Image.Image:
     return img
 
 
-st.set_page_config(page_title="ನಿತ್ಯ ಸತ್ಯ", page_icon="🟡", layout="centered")
-st.title("ನಿತ್ಯ ಸತ್ಯ – Daily Quote")
+# ------------------------- phone-friendly page -------------------------
+st.set_page_config(page_title="ನಿತ್ಯ ಸತ್ಯ", page_icon="🟡", layout="centered",
+                   initial_sidebar_state="collapsed")
+st.markdown("""
+<style>
+#MainMenu, footer, header [data-testid="stToolbar"] {visibility:hidden;}
+.block-container {padding:1rem 0.8rem 2rem 0.8rem; max-width:640px;}
+textarea {font-size:20px !important; line-height:1.5 !important;}
+.stButton > button, .stDownloadButton > button, [data-testid="stFormSubmitButton"] > button {
+  width:100%; padding:0.8rem 1rem; font-size:18px; font-weight:700; border-radius:10px;
+}
+[data-testid="stFormSubmitButton"] > button {background:#e6bd00; color:#111; border:0;}
+.stDownloadButton > button {background:#111; color:#fff; border:0;}
+img {border-radius:10px;}
+</style>
+""", unsafe_allow_html=True)
 
-quote = st.text_area("ಇಂದಿನ ಸುವಿಚಾರ (Today's quote)", height=160,
-                     placeholder="ಇಲ್ಲಿ ಬರೆಯಿರಿ…")
-img = make_image(quote)
-st.image(img, use_container_width=True)
+st.markdown("### 🟡 ನಿತ್ಯ ಸತ್ಯ")
+
+if "quote" not in st.session_state:
+    st.session_state.quote = ""
+
+with st.form("f", clear_on_submit=False):
+    text = st.text_area("ಇಂದಿನ ಸುವಿಚಾರ", value=st.session_state.quote, height=170,
+                        placeholder="ಇಲ್ಲಿ ಬರೆಯಿರಿ…", label_visibility="collapsed")
+    ok = st.form_submit_button("✔ Make image")
+if ok:
+    st.session_state.quote = text
+
+img = make_image(st.session_state.quote)
+st.image(img)
 
 buf = io.BytesIO()
 img.save(buf, format="PNG")
-st.download_button("⬇ Download PNG", buf.getvalue(),
-                   file_name=f"nitya-satya-{datetime.date.today()}.png",
-                   mime="image/png", use_container_width=True)
+st.download_button("⬇ Download image", buf.getvalue(),
+                   file_name=f"nitya-satya-{datetime.date.today()}.png", mime="image/png")
+st.caption("Phone: if the download goes to Files, long-press the image above → Save to Photos.")
