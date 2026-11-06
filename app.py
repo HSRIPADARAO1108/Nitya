@@ -97,13 +97,17 @@ def compass(img, cx, cy):
 def make_image(quote: str) -> Image.Image:
     img = Image.new("RGB", (W, H), YEL)
 
-    # soft light in the middle, like the original
-    glow = Image.radial_gradient("L").resize((W, H))
-    light = Image.new("RGB", (W, H), (240, 200, 10))
-    img = Image.composite(img, light, glow.point(lambda v: min(255, v * 2)))
+    # warm gradient: brighter gold in the middle, deeper at the edges
+    mask = Image.radial_gradient("L").resize((W, H))
+    img = Image.composite(Image.new("RGB", (W, H), (214, 170, 0)),
+                          Image.new("RGB", (W, H), (244, 205, 18)), mask)
 
     d = ImageDraw.Draw(img)
     d.text((W / 2, 100), TITLE, font=font(68), fill=BLK, anchor="mm")
+    # small ornament under the title
+    d.rectangle((360, 163, 500, 166), fill=BLK)
+    d.rectangle((580, 163, 720, 166), fill=BLK)
+    d.polygon([(540, 152), (552, 165), (540, 178), (528, 165)], fill=BLK)
     d.text((500, 1120), FOOTER, font=font(44), fill=BLK, anchor="mm")
 
     for box in [(124, 222, 788, 245), (124, 222, 146, 882), (906, 368, 928, 945),
@@ -116,7 +120,7 @@ def make_image(quote: str) -> Image.Image:
     # fixed watermark: thin, tilted, faint
     wm = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(wm).text((W / 2, 650), WATERMARK, font=font(92, 300),
-                            fill=(0, 0, 0, 80), anchor="mm")
+                            fill=(0, 0, 0, 62), anchor="mm")
     wm = wm.rotate(19, center=(W / 2, 650), resample=Image.BICUBIC)
     img.paste(wm, (0, 0), wm)
 
@@ -127,7 +131,7 @@ def make_image(quote: str) -> Image.Image:
     if quote:
         size = 110
         while size >= 22:
-            f = font(size)
+            f = font(size, 600)
             lh = size * 1.55
             lines = wrap(d, quote, f, bw)
             if len(lines) * lh <= bh:
@@ -135,7 +139,7 @@ def make_image(quote: str) -> Image.Image:
             size -= 2
         y = by + (bh - len(lines) * lh) / 2 + lh / 2
         for ln in lines:
-            d.text((bx + bw / 2, y), ln, font=f, fill=BLK, anchor="mm")
+            d.text((bx + bw / 2, y), ln, font=f, fill=(22, 14, 0), anchor="mm")
             y += lh
     return img
 
