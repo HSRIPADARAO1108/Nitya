@@ -1,16 +1,24 @@
-import io, datetime
+import io, math, datetime
 from pathlib import Path
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 
-FONT = str(Path(__file__).parent / "NotoSansKannada.ttf")
-W, H = 1080, 1207
+HERE = Path(__file__).parent
+FONT = str(HERE / "NotoSansKannada.ttf")
+ART = HERE / "shrine.jpeg"          # the pencil sketch (keep next to app.py)
+OY = 240                            # extra height added on top for the shrine
+W, H = 1080, 1207 + OY
 YEL, BLK, NAVY = (230, 189, 0), (17, 17, 17), (29, 42, 68)
 
 # ---- FIXED PARTS (edit here only if the template ever changes) ----
 TITLE = "ನಿತ್ಯ ಸತ್ಯ"
 FOOTER = ": ಲೋಕಾ ಸಮಸ್ತಾ ಸುಖಿನೋಭವಂತು :"
 WATERMARK = "ಗುರುರಾಜ್"
+ART_OPACITY = 1.0                   # shrine line darkness (1.0 = full black ink)
+ART_CENTER = (540, 135)             # centre of the shrine (above the title)
+ART_HEIGHT = 240                    # height of the shrine in pixels
+QUOTE_BOX = (200, 345 + OY, 660, 580)   # x, y, width, height of the quote area
+WM_ALPHA = 85                       # watermark strength (0-255)
 
 
 def font(size, weight=700):
@@ -53,7 +61,6 @@ def comma(dr, S, cx, cy):
     r = 31
     dr.ellipse(((cx - r) * S, (cy - r) * S, (cx + r) * S, (cy + r) * S), fill=BLK)
     pts = []
-    # curved tail: right edge of blob -> tip -> left edge of blob
     for t in range(0, 21):
         u = t / 20
         x = (1 - u) ** 2 * (cx + r) + 2 * (1 - u) * u * (cx + 26) + u ** 2 * (cx - 30)
@@ -68,12 +75,10 @@ def comma(dr, S, cx, cy):
 
 
 def quote_marks(img):
-    # closing mark (top-right)
     lay = smooth((200, 130), lambda dr, S: (comma(dr, S, 60, 40), comma(dr, S, 138, 40)))
-    img.paste(lay, (825, 235), lay)
-    # opening mark (bottom-left) = same shape turned 180 degrees
+    img.paste(lay, (825, 235 + OY), lay)
     op = lay.rotate(180)
-    img.paste(op, (40, 880), op)
+    img.paste(op, (40, 880 + OY), op)
 
 
 def compass(img, cx, cy):
@@ -81,11 +86,9 @@ def compass(img, cx, cy):
         c = 55
         dr.ellipse(((c - 37) * S, (c - 37) * S, (c + 37) * S, (c + 37) * S), outline=NAVY, width=3 * S)
         dr.ellipse(((c - 31) * S, (c - 31) * S, (c + 31) * S, (c + 31) * S), outline=NAVY, width=2 * S)
-        import math
         pts = []
         for i in range(16):
             ang = math.radians(i * 22.5 - 90)
-            rad = [29, 7, 12, 7][i % 4] if i % 2 == 0 or True else 7
             rad = 29 if i % 4 == 0 else (17 if i % 4 == 2 else 6)
             pts.append(((c + rad * math.cos(ang)) * S, (c + rad * math.sin(ang)) * S))
         dr.polygon(pts, fill=NAVY)
@@ -94,39 +97,66 @@ def compass(img, cx, cy):
     img.paste(lay, (cx - 55, cy - 55), lay)
 
 
-def make_image(quote: str) -> Image.Image:
-    img = Image.new("RGB", (W, H), YEL)
+_art_cache = {}
 
+
+def art_layer():
+    """Pencil sketch -> transparent ink layer (paper turns see-through, lines stay)."""
+    if "a" in _art_cache:
+        return _art_cache["a"]
+    g = ImageOps.grayscale(Image.open(ART))
+    g = ImageOps.autocontrast(g, cutoff=1)
+    # push light paper to pure white, keep the dark pencil lines
+    g = g.point(lambda v: 255 if v > 215 else int(255 * (v / 215) ** 1.3))
+    ink = ImageOps.invert(g)                       # 255 = line, 0 = paper
+    box = ink.point(lambda v: 255 if v > 40 else 0).getbbox()
+    if box:
+        ink = ink.crop(box)                        # trim empty paper margin
+    ratio = ART_HEIGHT / ink.height
+    ink = ink.resize((int(ink.width * ratio), ART_HEIGHT), Image.LANCZOS)
+    ink = ink.filter(ImageFilter.UnsharpMask(radius=1.2, percent=140, threshold=2))
+    ink = ink.point(lambda v: min(255, int(v * 1.25 * ART_OPACITY)))
+    layer = Image.new("RGBA", ink.size, (22, 14, 0, 0))
+    layer.putalpha(ink)
+    _art_cache["a"] = layer
+    return layer
+
+
+def make_image(quote: str) -> Image.Image:
     # warm gradient: brighter gold in the middle, deeper at the edges
     mask = Image.radial_gradient("L").resize((W, H))
     img = Image.composite(Image.new("RGB", (W, H), (214, 170, 0)),
                           Image.new("RGB", (W, H), (244, 205, 18)), mask)
 
-    d = ImageDraw.Draw(img)
-    d.text((W / 2, 100), TITLE, font=font(68), fill=BLK, anchor="mm")
-    # small ornament under the title
-    d.rectangle((360, 163, 500, 166), fill=BLK)
-    d.rectangle((580, 163, 720, 166), fill=BLK)
-    d.polygon([(540, 152), (552, 165), (540, 178), (528, 165)], fill=BLK)
-    d.text((500, 1120), FOOTER, font=font(44), fill=BLK, anchor="mm")
+    # sacred artwork sits at the very back, behind everything
+    if ART.exists():
+        a = art_layer()
+        img.paste(a, (ART_CENTER[0] - a.width // 2, ART_CENTER[1] - a.height // 2), a)
 
-    for box in [(124, 222, 788, 245), (124, 222, 146, 882), (906, 368, 928, 945),
-                (264, 1005, 806, 1027), (830, 1005, 928, 1027), (906, 968, 928, 1027)]:
-        d.rectangle(box, fill=BLK)
+    d = ImageDraw.Draw(img)
+    d.text((W / 2, 100 + OY), TITLE, font=font(68), fill=BLK, anchor="mm")
+    d.rectangle((360, 163 + OY, 500, 166 + OY), fill=BLK)
+    d.rectangle((580, 163 + OY, 720, 166 + OY), fill=BLK)
+    d.polygon([(540, 152 + OY), (552, 165 + OY), (540, 178 + OY), (528, 165 + OY)], fill=BLK)
+    d.text((500, 1120 + OY), FOOTER, font=font(44), fill=BLK, anchor="mm")
+
+    for x0, y0, x1, y1 in [(124, 222, 788, 245), (124, 222, 146, 882), (906, 368, 928, 945),
+                           (264, 1005, 806, 1027), (830, 1005, 928, 1027), (906, 968, 928, 1027)]:
+        d.rectangle((x0, y0 + OY, x1, y1 + OY), fill=BLK)
 
     quote_marks(img)
-    compass(img, 1008, 1135)
+    compass(img, 1008, 1135 + OY)
 
     # fixed watermark: thin, tilted, faint
     wm = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(wm).text((W / 2, 650), WATERMARK, font=font(92, 300),
-                            fill=(0, 0, 0, 62), anchor="mm")
-    wm = wm.rotate(19, center=(W / 2, 650), resample=Image.BICUBIC)
+    ImageDraw.Draw(wm).text((W / 2, 650 + OY), WATERMARK, font=font(130, 500),
+                            fill=(0, 0, 0, WM_ALPHA), anchor="mm")
+    wm = wm.rotate(19, center=(W / 2, 650 + OY), resample=Image.BICUBIC)
     img.paste(wm, (0, 0), wm)
 
     # daily quote, auto-fit
     d = ImageDraw.Draw(img)
-    bx, by, bw, bh = 200, 345, 660, 580
+    bx, by, bw, bh = QUOTE_BOX
     quote = quote.strip()
     if quote:
         size = 110
