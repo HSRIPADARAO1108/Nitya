@@ -1,6 +1,8 @@
-import io, math, datetime
+import io, math, base64, datetime
+from urllib.parse import quote as urlquote
 from pathlib import Path
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 
 HERE = Path(__file__).parent
@@ -187,6 +189,7 @@ textarea {font-size:20px !important; line-height:1.5 !important;}
 }
 [data-testid="stFormSubmitButton"] > button {background:#e6bd00; color:#111; border:0;}
 .stDownloadButton > button {background:#111; color:#fff; border:0;}
+.stLinkButton > a {width:100%; padding:0.8rem 1rem; font-size:18px; font-weight:700; border-radius:10px; background:#25D366; color:#111 !important; border:0; text-align:center;}
 img {border-radius:10px;}
 </style>
 """, unsafe_allow_html=True)
@@ -208,6 +211,51 @@ st.image(img)
 
 buf = io.BytesIO()
 img.save(buf, format="PNG")
-st.download_button("⬇ Download image", buf.getvalue(),
-                   file_name=f"nitya-satya-{datetime.date.today()}.png", mime="image/png")
-st.caption("Phone: if the download goes to Files, long-press the image above → Save to Photos.")
+png = buf.getvalue()
+fname = f"nitya-satya-{datetime.date.today()}.png"
+
+st.download_button("⬇ Download image", png, file_name=fname, mime="image/png")
+
+
+def share_button(png_bytes, filename):
+    """Opens the phone's own share sheet (WhatsApp, Instagram, Telegram...) with the image attached."""
+    b64 = base64.b64encode(png_bytes).decode()
+    html = f"""
+<style>
+  body{{margin:0;font-family:sans-serif}}
+  button{{width:100%;padding:0.8rem 1rem;font-size:18px;font-weight:700;border:0;
+         border-radius:10px;background:#e6bd00;color:#111;cursor:pointer}}
+  #m{{font-size:13px;color:#555;margin-top:6px;text-align:center}}
+</style>
+<button id="b">📤 Share image</button><div id="m"></div>
+<script>
+const b64="{b64}", name="{filename}";
+document.getElementById("b").onclick = async () => {{
+  const m = document.getElementById("m");
+  try {{
+    const bin = atob(b64), arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const file = new File([arr], name, {{type: "image/png"}});
+    if (navigator.canShare && navigator.canShare({{files: [file]}})) {{
+      await navigator.share({{files: [file], title: "ನಿತ್ಯ ಸತ್ಯ"}});
+    }} else {{
+      m.textContent = "Sharing is not supported here. Use Download, then share from your gallery.";
+    }}
+  }} catch (e) {{
+    if (e.name !== "AbortError") m.textContent = "Could not open share. Use Download instead.";
+  }}
+}};
+</script>"""
+    if hasattr(st, "iframe"):          # newer Streamlit
+        st.iframe(html, height=90)
+    else:                              # older Streamlit
+        components.html(html, height=90)
+
+
+share_button(png, fname)
+
+if st.session_state.quote.strip():
+    wa = "https://wa.me/?text=" + urlquote(f"{TITLE}\n\n{st.session_state.quote.strip()}\n\n{FOOTER}")
+    st.link_button("💬 Share text on WhatsApp", wa, use_container_width=True)
+
+st.caption("Phone: Share image opens WhatsApp, Instagram and more. If it doesn't, long-press the image above → Save to Photos.")
