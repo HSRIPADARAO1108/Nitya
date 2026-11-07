@@ -9,18 +9,20 @@ HERE = Path(__file__).parent
 FONT = str(HERE / "NotoSansKannada.ttf")
 ART = HERE / "shrine.jpeg"          # the pencil sketch (keep next to app.py)
 OY = 240                            # extra height added on top for the shrine
-W, H = 1080, 1207 + OY
+W, H = 1080, 1227 + OY
 YEL, BLK, NAVY = (230, 189, 0), (17, 17, 17), (29, 42, 68)
 
 # ---- FIXED PARTS (edit here only if the template ever changes) ----
 TITLE = "ನಿತ್ಯ ಸತ್ಯ"
+AUTHOR = "ಕೆ. ಎಸ್. ಗುರುರಾಜ್"
 FOOTER = ": ಲೋಕಾ ಸಮಸ್ತಾ ಸುಖಿನೋಭವಂತು :"
-WATERMARK = "ಗುರುರಾಜ್"
 ART_OPACITY = 1.0                   # shrine line darkness (1.0 = full black ink)
-ART_CENTER = (540, 135)             # centre of the shrine (above the title)
+ART_CENTER = (540, 150)             # centre of the shrine (above the title)
 ART_HEIGHT = 240                    # height of the shrine in pixels
-QUOTE_BOX = (200, 345 + OY, 660, 580)   # x, y, width, height of the quote area
-WM_ALPHA = 85                       # watermark strength (0-255)
+QUOTE_BOX = (210, 335 + OY, 660, 580)   # x, y, width, height of the quote area
+AUTHOR_Y = 1094 + OY                # name line (above the footer)
+FOOTER_Y = 1160 + OY                # footer line
+CENTER_X = W / 2                    # exact horizontal centre for title, name, footer
 
 
 def font(size, weight=700):
@@ -78,9 +80,9 @@ def comma(dr, S, cx, cy):
 
 def quote_marks(img):
     lay = smooth((200, 130), lambda dr, S: (comma(dr, S, 60, 40), comma(dr, S, 138, 40)))
-    img.paste(lay, (825, 235 + OY), lay)
+    img.paste(lay, (831, 235 + OY), lay)
     op = lay.rotate(180)
-    img.paste(op, (40, 880 + OY), op)
+    img.paste(op, (49, 880 + OY), op)
 
 
 def compass(img, cx, cy):
@@ -108,12 +110,11 @@ def art_layer():
         return _art_cache["a"]
     g = ImageOps.grayscale(Image.open(ART))
     g = ImageOps.autocontrast(g, cutoff=1)
-    # push light paper to pure white, keep the dark pencil lines
     g = g.point(lambda v: 255 if v > 215 else int(255 * (v / 215) ** 1.3))
     ink = ImageOps.invert(g)                       # 255 = line, 0 = paper
     box = ink.point(lambda v: 255 if v > 40 else 0).getbbox()
     if box:
-        ink = ink.crop(box)                        # trim empty paper margin
+        ink = ink.crop(box)
     ratio = ART_HEIGHT / ink.height
     ink = ink.resize((int(ink.width * ratio), ART_HEIGHT), Image.LANCZOS)
     ink = ink.filter(ImageFilter.UnsharpMask(radius=1.2, percent=140, threshold=2))
@@ -136,25 +137,17 @@ def make_image(quote: str) -> Image.Image:
         img.paste(a, (ART_CENTER[0] - a.width // 2, ART_CENTER[1] - a.height // 2), a)
 
     d = ImageDraw.Draw(img)
-    d.text((W / 2, 100 + OY), TITLE, font=font(68), fill=BLK, anchor="mm")
-    d.rectangle((360, 163 + OY, 500, 166 + OY), fill=BLK)
-    d.rectangle((580, 163 + OY, 720, 166 + OY), fill=BLK)
-    d.polygon([(540, 152 + OY), (552, 165 + OY), (540, 178 + OY), (528, 165 + OY)], fill=BLK)
-    d.text((500, 1120 + OY), FOOTER, font=font(44), fill=BLK, anchor="mm")
+    d.text((CENTER_X, 120 + OY), TITLE, font=font(68), fill=BLK, anchor="mm")
+    d.text((CENTER_X, AUTHOR_Y), AUTHOR, font=font(50), fill=BLK, anchor="mm")
+    d.text((CENTER_X, FOOTER_Y), FOOTER, font=font(44), fill=BLK, anchor="mm")
 
-    for x0, y0, x1, y1 in [(124, 222, 788, 245), (124, 222, 146, 882), (906, 368, 928, 945),
-                           (264, 1005, 806, 1027), (830, 1005, 928, 1027), (906, 968, 928, 1027)]:
+    # frame is centred on the page: equal 138 px margin on the left and right
+    for x0, y0, x1, y1 in [(138, 222, 802, 245), (138, 222, 160, 882), (920, 368, 942, 945),
+                           (278, 1005, 820, 1027), (844, 1005, 942, 1027), (920, 968, 942, 1027)]:
         d.rectangle((x0, y0 + OY, x1, y1 + OY), fill=BLK)
 
     quote_marks(img)
-    compass(img, 1008, 1135 + OY)
-
-    # fixed watermark: thin, tilted, faint
-    wm = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(wm).text((W / 2, 650 + OY), WATERMARK, font=font(130, 500),
-                            fill=(0, 0, 0, WM_ALPHA), anchor="mm")
-    wm = wm.rotate(19, center=(W / 2, 650 + OY), resample=Image.BICUBIC)
-    img.paste(wm, (0, 0), wm)
+    compass(img, 1008, FOOTER_Y)
 
     # daily quote, auto-fit
     d = ImageDraw.Draw(img)
