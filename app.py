@@ -10,7 +10,7 @@ FONT = str(HERE / "NotoSansKannada.ttf")
 ART = HERE / "shrine.jpeg"          # the pencil sketch (keep next to app.py)
 OY = 235                            # extra height added on top for the shrine + title
 W, H = 1080, 1227 + OY
-BG = (254, 238, 4)                  # bright lemon yellow (matched to your reference image)
+BG = (255, 246, 20)                 # brighter lemon yellow (was 254, 238, 4 = your reference)
 YEL, BLK, NAVY = BG, (10, 10, 10), (29, 42, 68)
 
 # ---- FIXED PARTS (edit here only if the template ever changes) ----
