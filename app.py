@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 HERE = Path(__file__).parent
 FONT = str(HERE / "NotoSansKannada.ttf")
 ART = HERE / "shrine.jpeg"          # the pencil sketch (keep next to app.py)
-OY = 240                            # extra height added on top for the shrine
+OY = 235                            # extra height added on top for the shrine + title
 W, H = 1080, 1227 + OY
 BG = (254, 238, 4)                  # bright lemon yellow (matched to your reference image)
 YEL, BLK, NAVY = BG, (10, 10, 10), (29, 42, 68)
@@ -18,8 +18,8 @@ TITLE = "ನಿತ್ಯ ಸತ್ಯ"
 AUTHOR = "ಕೆ. ಎಸ್. ಗುರುರಾಜ್"
 FOOTER = ": ಲೋಕಾ ಸಮಸ್ತಾ ಸುಖಿನೋಭವಂತು :"
 ART_OPACITY = 1.0                   # shrine line darkness (1.0 = full black ink)
-ART_CENTER = (540, 150)             # centre of the shrine (above the title)
-ART_HEIGHT = 240                    # height of the shrine in pixels
+ART_CENTER = (540, 160)             # centre of the shrine (above the title)
+ART_HEIGHT = 300                    # height of the shrine in pixels
 QUOTE_BOX = (210, 335 + OY, 660, 580)   # x, y, width, height of the quote area
 AUTHOR_Y = 1094 + OY                # name line (above the footer)
 FOOTER_Y = 1160 + OY                # footer line
@@ -136,7 +136,7 @@ def make_image(quote: str) -> Image.Image:
         img.paste(a, (ART_CENTER[0] - a.width // 2, ART_CENTER[1] - a.height // 2), a)
 
     d = ImageDraw.Draw(img)
-    d.text((CENTER_X, 120 + OY), TITLE, font=font(68), fill=BLK, anchor="mm")
+    d.text((CENTER_X, 148 + OY), TITLE, font=font(68), fill=BLK, anchor="mm")
     d.text((CENTER_X, AUTHOR_Y), AUTHOR, font=font(50), fill=BLK, anchor="mm")
     d.text((CENTER_X, FOOTER_Y), FOOTER, font=font(44), fill=BLK, anchor="mm")
 
@@ -174,7 +174,8 @@ st.set_page_config(page_title="ನಿತ್ಯ ಸತ್ಯ", page_icon="🟡", 
 st.markdown("""
 <style>
 #MainMenu, footer, header [data-testid="stToolbar"] {visibility:hidden;}
-.block-container {padding:1rem 0.8rem 2rem 0.8rem; max-width:640px;}
+[data-testid="stHeader"] {display:none;}
+.block-container {padding:0.6rem 0.8rem 2rem 0.8rem; max-width:640px;}
 textarea {font-size:20px !important; line-height:1.5 !important;}
 .stButton > button, .stDownloadButton > button, [data-testid="stFormSubmitButton"] > button {
   width:100%; padding:0.8rem 1rem; font-size:18px; font-weight:700; border-radius:10px;
