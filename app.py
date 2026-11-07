@@ -10,7 +10,8 @@ FONT = str(HERE / "NotoSansKannada.ttf")
 ART = HERE / "shrine.jpeg"          # the pencil sketch (keep next to app.py)
 OY = 240                            # extra height added on top for the shrine
 W, H = 1080, 1227 + OY
-YEL, BLK, NAVY = (230, 189, 0), (17, 17, 17), (29, 42, 68)
+BG = (254, 238, 4)                  # bright lemon yellow (matched to your reference image)
+YEL, BLK, NAVY = BG, (10, 10, 10), (29, 42, 68)
 
 # ---- FIXED PARTS (edit here only if the template ever changes) ----
 TITLE = "ನಿತ್ಯ ಸತ್ಯ"
@@ -119,17 +120,15 @@ def art_layer():
     ink = ink.resize((int(ink.width * ratio), ART_HEIGHT), Image.LANCZOS)
     ink = ink.filter(ImageFilter.UnsharpMask(radius=1.2, percent=140, threshold=2))
     ink = ink.point(lambda v: min(255, int(v * 1.25 * ART_OPACITY)))
-    layer = Image.new("RGBA", ink.size, (22, 14, 0, 0))
+    layer = Image.new("RGBA", ink.size, (10, 10, 10, 0))
     layer.putalpha(ink)
     _art_cache["a"] = layer
     return layer
 
 
 def make_image(quote: str) -> Image.Image:
-    # warm gradient: brighter gold in the middle, deeper at the edges
-    mask = Image.radial_gradient("L").resize((W, H))
-    img = Image.composite(Image.new("RGB", (W, H), (214, 170, 0)),
-                          Image.new("RGB", (W, H), (244, 205, 18)), mask)
+    # flat bright lemon-yellow background
+    img = Image.new("RGB", (W, H), BG)
 
     # sacred artwork sits at the very back, behind everything
     if ART.exists():
@@ -164,7 +163,7 @@ def make_image(quote: str) -> Image.Image:
             size -= 2
         y = by + (bh - len(lines) * lh) / 2 + lh / 2
         for ln in lines:
-            d.text((bx + bw / 2, y), ln, font=f, fill=(22, 14, 0), anchor="mm")
+            d.text((bx + bw / 2, y), ln, font=f, fill=BLK, anchor="mm")
             y += lh
     return img
 
