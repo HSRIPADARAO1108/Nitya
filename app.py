@@ -29,7 +29,9 @@ CENTER_X = W / 2                    # exact horizontal centre for title, name, f
 # ---- WATERMARK (centre of the quote frame) ----
 WM_CENTER = (540, 625 + OY)         # exact centre of the frame: x = page centre, y = frame middle
 WM_HEIGHT = 560                     # height of the watermark in pixels
-WM_OPACITY = 0.30                   # 0.0 = invisible ... 1.0 = solid (0.25-0.35 looks good)
+WM_OPACITY = 0.20                   # 0.0 = invisible ... 1.0 = solid (kept light so the quote stays readable)
+QUOTE_WEIGHT = 900                  # quote boldness: 700 = bold, 900 = extra bold (max)
+QUOTE_STROKE = 1                    # extra thickening in pixels (0 = none, 1-2 = bolder)
 
 
 def font(size, weight=700):
@@ -183,7 +185,7 @@ def make_image(quote: str) -> Image.Image:
     if quote:
         size = 110
         while size >= 22:
-            f = font(size, 600)
+            f = font(size, QUOTE_WEIGHT)
             lh = size * 1.55
             lines = wrap(d, quote, f, bw)
             if len(lines) * lh <= bh:
@@ -191,7 +193,8 @@ def make_image(quote: str) -> Image.Image:
             size -= 2
         y = by + (bh - len(lines) * lh) / 2 + lh / 2
         for ln in lines:
-            d.text((bx + bw / 2, y), ln, font=f, fill=BLK, anchor="mm")
+            d.text((bx + bw / 2, y), ln, font=f, fill=BLK, anchor="mm",
+                   stroke_width=QUOTE_STROKE, stroke_fill=BLK)
             y += lh
     return img
 
