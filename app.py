@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 HERE = Path(__file__).parent
 FONT = str(HERE / "NotoSansKannada.ttf")
 ART = HERE / "shrine.jpeg"          # the pencil sketch (keep next to app.py)
+WATERMARK = HERE / "watermark.png"  # your handwritten logo, transparent PNG (keep next to app.py)
 OY = 235                            # extra height added on top for the shrine + title
 W, H = 1080, 1227 + OY
 BG = (255, 246, 20)                 # brighter lemon yellow (was 254, 238, 4 = your reference)
@@ -24,6 +25,11 @@ QUOTE_BOX = (210, 335 + OY, 660, 580)   # x, y, width, height of the quote area
 AUTHOR_Y = 1094 + OY                # name line (above the footer)
 FOOTER_Y = 1160 + OY                # footer line
 CENTER_X = W / 2                    # exact horizontal centre for title, name, footer
+
+# ---- WATERMARK (centre of the quote frame) ----
+WM_CENTER = (540, 625 + OY)         # exact centre of the frame: x = page centre, y = frame middle
+WM_HEIGHT = 560                     # height of the watermark in pixels
+WM_OPACITY = 0.30                   # 0.0 = invisible ... 1.0 = solid (0.25-0.35 looks good)
 
 
 def font(size, weight=700):
@@ -126,6 +132,23 @@ def art_layer():
     return layer
 
 
+def watermark_layer():
+    """Handwritten logo (transparent PNG) -> faint watermark, resized and made see-through."""
+    if "w" in _art_cache:
+        return _art_cache["w"]
+    wm = Image.open(WATERMARK).convert("RGBA")
+    box = wm.getchannel("A").point(lambda v: 255 if v > 10 else 0).getbbox()
+    if box:
+        wm = wm.crop(box)                          # trim empty margin so centring is exact
+    ratio = WM_HEIGHT / wm.height
+    wm = wm.resize((int(wm.width * ratio), WM_HEIGHT), Image.LANCZOS)
+    r, g, b, a = wm.split()
+    a = a.point(lambda v: int(v * WM_OPACITY))
+    wm = Image.merge("RGBA", (r, g, b, a))
+    _art_cache["w"] = wm
+    return wm
+
+
 def make_image(quote: str) -> Image.Image:
     # flat bright lemon-yellow background
     img = Image.new("RGB", (W, H), BG)
@@ -134,6 +157,11 @@ def make_image(quote: str) -> Image.Image:
     if ART.exists():
         a = art_layer()
         img.paste(a, (ART_CENTER[0] - a.width // 2, ART_CENTER[1] - a.height // 2), a)
+
+    # watermark: centred inside the frame, behind the quote text
+    if WATERMARK.exists():
+        wm = watermark_layer()
+        img.paste(wm, (WM_CENTER[0] - wm.width // 2, WM_CENTER[1] - wm.height // 2), wm)
 
     d = ImageDraw.Draw(img)
     d.text((CENTER_X, 148 + OY), TITLE, font=font(68), fill=BLK, anchor="mm")
