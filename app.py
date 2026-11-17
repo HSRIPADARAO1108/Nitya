@@ -29,9 +29,9 @@ CENTER_X = W / 2                    # exact horizontal centre for title, name, f
 # ---- WATERMARK (centre of the quote frame) ----
 WM_CENTER = (540, 625 + OY)         # exact centre of the frame: x = page centre, y = frame middle
 WM_HEIGHT = 560                     # height of the watermark in pixels
-WM_OPACITY = 0.20                   # 0.0 = invisible ... 1.0 = solid (kept light so the quote stays readable)
-QUOTE_WEIGHT = 900                  # quote boldness: 700 = bold, 900 = extra bold (max)
-QUOTE_STROKE = 1                    # extra thickening in pixels (0 = none, 1-2 = bolder)
+WM_OPACITY = 0.24                   # 0.0 = invisible ... 1.0 = solid
+QUOTE_WEIGHT = 760                  # quote boldness: 600 = semi-bold, 700 = bold, 900 = extra bold
+QUOTE_STROKE = 0                    # extra thickening in pixels (0 = none, 1 = bolder)
 
 
 def font(size, weight=700):
